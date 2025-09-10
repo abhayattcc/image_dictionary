@@ -2006,81 +2006,54 @@ function exportText() {
     URL.revokeObjectURL(url);
 }
 
-function handleCopy(event) {
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
-    if (selectedText && document.getElementById('reader-section').classList.contains('visible')) {
-        event.preventDefault();
-        navigator.clipboard.writeText(selectedText).then(() => {
-            showPopup(selectedText);
-        });
-    }
-}
-
-function handleDoubleTap(event) {
+function handleTextSelection(event) {
     if (!document.getElementById('reader-section').classList.contains('visible')) return;
 
-    const textContentDiv = document.getElementById('text-content');
-    const touch = event.changedTouches[0];
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
 
-    if (element && element.tagName === 'SPAN' && element.hasAttribute('data-sentence-index')) {
-        const sentenceIndex = parseInt(element.getAttribute('data-sentence-index'), 10);
-        lastTappedSentenceIndex = sentenceIndex;
-        if (lastTappedFile) {
-            saveLastTappedPosition(lastTappedFile, lastTappedSentenceIndex, currentPageIndex);
-        }
+    if (selectedText) {
+        const textContentDiv = document.getElementById('text-content');
+        const range = selection.getRangeAt(0);
+        const startContainer = range.startContainer;
+        let spanElement = startContainer.nodeType === Node.ELEMENT_NODE ? startContainer : startContainer.parentElement;
 
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const rects = range.getClientRects();
-        let word = null;
-        const touchX = touch.clientX;
-        const touchY = touch.clientY;
-
-        for (let i = 0; i < rects.length; i++) {
-            const rect = rects[i];
-            if (touchX >= rect.left && touchX <= rect.right && touchY >= rect.top && touchY <= rect.bottom) {
-                const text = element.textContent;
-                const words = text.split(/\s+/).filter(w => w.trim());
-                const charIndex = Math.round((touchX - rect.left) / rect.width * text.length);
-                let currentPos = 0;
-                for (const w of words) {
-                    const wordStart = text.indexOf(w, currentPos);
-                    const wordEnd = wordStart + w.length;
-                    if (charIndex >= wordStart && charIndex <= wordEnd) {
-                        word = w.replace(/[^A-Za-z\u0900-\u097F\u0B00-\u0B7F]/g, '').trim();
-                        break;
-                    }
-                    currentPos = wordEnd;
-                }
-                break;
+        if (spanElement.tagName === 'SPAN' && spanElement.hasAttribute('data-sentence-index')) {
+            const sentenceIndex = parseInt(spanElement.getAttribute('data-sentence-index'), 10);
+            lastTappedSentenceIndex = sentenceIndex;
+            if (lastTappedFile) {
+                saveLastTappedPosition(lastTappedFile, lastTappedSentenceIndex, currentPageIndex);
             }
         }
 
-        if (word) {
-            showPopup(word);
-        } else {
-            showPopup(element.textContent.trim());
+        // Split the selected text into words and find a single word if possible
+        const words = selectedText.split(/\s+/).filter(w => w.trim());
+        let wordToSearch = selectedText;
+
+        // If the selection is within a single span and contains one word, use that word
+        if (words.length === 1) {
+            wordToSearch = words[0].replace(/[^A-Za-z\u0900-\u097F\u0B00-\u0B7F]/g, '').trim();
+        } else if (spanElement.tagName === 'SPAN') {
+            // If multiple words are selected, try to find the word at the cursor position
+            const rangeRect = range.getBoundingClientRect();
+            const text = spanElement.textContent;
+            const wordsInSpan = text.split(/\s+/).filter(w => w.trim());
+            const charIndex = range.startOffset;
+            let currentPos = 0;
+
+            for (const w of wordsInSpan) {
+                const wordStart = text.indexOf(w, currentPos);
+                const wordEnd = wordStart + w.length;
+                if (charIndex >= wordStart && charIndex <= wordEnd) {
+                    wordToSearch = w.replace(/[^A-Za-z\u0900-\u097F\u0B00-\u0B7F]/g, '').trim();
+                    break;
+                }
+                currentPos = wordEnd;
+            }
         }
+
+        showPopup(wordToSearch);
     }
-}
-
-let lastTapTime = 0;
-const doubleTapDelay = 300;
-
-function setupDoubleTapListener() {
-    const textContentDiv = document.getElementById('text-content');
-    textContentDiv.addEventListener('touchend', (event) => {
-        const currentTime = new Date().getTime();
-        const tapInterval = currentTime - lastTapTime;
-
-        if (tapInterval < doubleTapDelay && tapInterval > 0) {
-            event.preventDefault();
-            handleDoubleTap(event);
-        }
-        lastTapTime = currentTime;
-    });
 }
 
 function clearInputOnClick(event) {
@@ -2277,8 +2250,9 @@ async function initializeApp() {
 
     textEditBtn.addEventListener('click', toggleEditText);
 
-    document.addEventListener('copy', handleCopy);
-    setupDoubleTapListener();
+    // Add event listener for text selection
+    document.getElementById('text-content').addEventListener('mouseup', handleTextSelection);
+    document.getElementById('text-content').addEventListener('touchend', handleTextSelection);
 }
 
 initializeApp();
