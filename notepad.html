@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=yes">
     <title>Kids Notepad</title>
     <style>
     * {
@@ -26,6 +26,20 @@
         width: 100vw;
         position: relative;
     }
+.nav-button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 10px;
+            background-color: #007BFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .nav-button:hover {
+            background-color: #0056b3;
+        }
+
     .tabs {
         display: flex;
         background-color: #ff69b4;
@@ -106,13 +120,14 @@
         height: calc(100vh - 60px);
         overflow: auto;
     }
-    #textEditor, #drawingCanvas, #overlayCanvas, #savedTextList {
+    .content.locked {
+        overflow: auto;
+    }
+    #textEditor, #savedTextList {
         width: 100%;
         height: 100%;
         border-radius: 8px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-    #textEditor, #savedTextList {
         border: none;
         resize: none;
         font-size: 16px;
@@ -142,13 +157,16 @@
         min-height: 60px;
     }
     #drawingCanvas, #overlayCanvas {
-        touch-action: pinch-zoom;
+        touch-action: auto;
         position: absolute;
         top: 10px;
         left: 10px;
-        width: 100%;
         height: 100%;
+        width: 100%;
         transition: opacity 0.5s ease-out;
+    }
+    #drawingCanvas.locked, #overlayCanvas.locked {
+        touch-action: auto;
     }
     #overlayCanvas {
         background: transparent;
@@ -248,8 +266,11 @@
         margin-top: 5px;
         color: #333;
     }
-</style>
+    </style>
+</head>
+<body>
 <div class="container">
+    <a href="index.html" class="nav-button">Home</a>
     <div class="tabs" id="tabs">
         <div class="tab active" onclick="toggleSection('text')">📝 Write</div>
         <div class="tab" onclick="toggleSection('drawing')">🎨 Draw</div>
@@ -273,6 +294,7 @@
         <div class="toolbar-group hidden" id="drawingTools">
             <button title="Toggle Drawing" id="drawButton" onclick="toggleDrawing()">✍️</button>
             <button title="Eraser" id="eraseButton" onclick="toggleErase()">🧹</button>
+            <button title="Lock View" id="lockButton" onclick="toggleLock()">🔒</button>
             <button title="Reset Position" onclick="resetPosition()">🔄</button>
             <button title="New Page" onclick="newCanvasPage()">➕</button>
             <button title="Clear Current Page" onclick="clearCurrentPage()">🗑️</button>
@@ -474,6 +496,7 @@
     let currentPageIndex = 0;
     let isDrawing = false;
     let isErasing = false;
+    let isLocked = false;
     let penWidth = 5;
     let penColor = "#008000";
     let savedTexts = {};
@@ -490,6 +513,8 @@
     let pdfPageCount = 0;
     let lastPoint = null;
     let lastTime = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
 
     // Initialize canvases
     const canvas = document.getElementById('drawingCanvas');
@@ -524,8 +549,9 @@
         }, 300);
     }
 
-    // Drawing and erasing toggle
+    // Drawing, erasing, and lock toggle
     function toggleDrawing() {
+        if (isLocked) return;
         isDrawing = !isDrawing;
         isErasing = false;
         const drawButton = document.getElementById('drawButton');
@@ -535,12 +561,38 @@
     }
 
     function toggleErase() {
+        if (isLocked) return;
         isErasing = !isErasing;
         isDrawing = false;
         const drawButton = document.getElementById('drawButton');
         const eraseButton = document.getElementById('eraseButton');
         eraseButton.classList.toggle('active', isErasing);
         drawButton.classList.remove('active');
+    }
+
+    function toggleLock() {
+        isLocked = !isLocked;
+        const lockButton = document.getElementById('lockButton');
+        const drawButton = document.getElementById('drawButton');
+        const eraseButton = document.getElementById('eraseButton');
+        const content = document.getElementById('content');
+        const drawingCanvas = document.getElementById('drawingCanvas');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+
+        lockButton.classList.toggle('active', isLocked);
+        if (isLocked) {
+            isDrawing = false;
+            isErasing = false;
+            drawButton.classList.remove('active');
+            eraseButton.classList.remove('active');
+            content.classList.add('locked');
+            drawingCanvas.classList.add('locked');
+            overlayCanvas.classList.add('locked');
+        } else {
+            content.classList.remove('locked');
+            drawingCanvas.classList.remove('locked');
+            overlayCanvas.classList.remove('locked');
+        }
     }
 
     function resetPosition() {
@@ -567,8 +619,11 @@
             } else {
                 isTextCollapsed = false;
                 isDrawingCollapsed = false;
+                isLocked = false;
                 toolbar.classList.remove('hidden');
                 content.classList.remove('fullscreen');
+                content.classList.remove('locked');
+                document.getElementById('lockButton').classList.remove('active');
                 showSection('text');
             }
         } else if (section === 'drawing') {
@@ -585,8 +640,11 @@
             } else {
                 isDrawingCollapsed = false;
                 isTextCollapsed = false;
+                isLocked = false;
                 toolbar.classList.remove('hidden');
                 content.classList.remove('fullscreen');
+                content.classList.remove('locked');
+                document.getElementById('lockButton').classList.remove('active');
                 showSection('drawing');
             }
         }
@@ -609,8 +667,13 @@
             document.getElementById('drawingTools').classList.add('hidden');
             isDrawing = false;
             isErasing = false;
+            isLocked = false;
             document.getElementById('drawButton').classList.remove('active');
             document.getElementById('eraseButton').classList.remove('active');
+            document.getElementById('lockButton').classList.remove('active');
+            document.getElementById('content').classList.remove('locked');
+            document.getElementById('drawingCanvas').classList.remove('locked');
+            document.getElementById('overlayCanvas').classList.remove('locked');
         } else {
             document.getElementById('drawingCanvas').classList.remove('hidden');
             document.getElementById('overlayCanvas').classList.remove('hidden');
@@ -851,7 +914,7 @@
                 try {
                     currentPdf = null;
                     pdfPageCount = 0;
-                    canvasPages = [document.createElement('canvas')];
+                    canvasPages = [];
                     currentPageIndex = 0;
                     undoStack = [];
                     redoStack = [];
@@ -920,6 +983,11 @@
                         }
                         canvasPages = Array(pdfPageCount).fill().map(() => document.createElement('canvas'));
                         progressBarContainer.classList.add('hidden');
+                        isLocked = true; // Open in lock mode by default
+                        document.getElementById('lockButton').classList.add('active');
+                        document.getElementById('content').classList.add('locked');
+                        document.getElementById('drawingCanvas').classList.add('locked');
+                        document.getElementById('overlayCanvas').classList.add('locked');
                         showSection('drawing');
                         renderPage(1);
                     }
@@ -1219,10 +1287,9 @@
                 const newCanvas = document.createElement('canvas');
                 newCanvas.width = content.offsetWidth;
                 newCanvas.height = content.offsetHeight;
-                canvasPages.push(newCanvas);
-                currentPageIndex = canvasPages.length - 1;
-                currentPdf = null;
-                pdfPageCount = 0;
+                // Insert new blank page after the current page
+                canvasPages.splice(currentPageIndex + 1, 0, newCanvas);
+                currentPageIndex = currentPageIndex + 1;
                 const selector = document.getElementById('pageSelector');
                 selector.innerHTML = '';
                 for (let i = 1; i <= canvasPages.length; i++) {
@@ -1231,7 +1298,7 @@
                     option.text = `Page ${i}`;
                     selector.appendChild(option);
                 }
-                selector.value = canvasPages.length;
+                selector.value = currentPageIndex + 1;
                 undoStack = [];
                 redoStack = [];
                 overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
@@ -1261,7 +1328,7 @@
                     const ctx = currentCanvas.getContext('2d');
                     const imageData = ctx.getImageData(0, 0, currentCanvas.width, currentCanvas.height).data;
                     const isEmpty = Array.from(imageData).every(pixel => pixel === 0 || pixel === 255);
-                    if (isEmpty && canvasPages.length > 1) {
+                    if (isEmpty && canvasPages.length > 1 && currentPageIndex >= pdfPageCount) {
                         canvasPages.splice(currentPageIndex, 1);
                         deleteFromStore('canvasPages', `canvasPage_${currentPageIndex}`)
                             .then(() => {
@@ -1441,7 +1508,7 @@
     }
 
     function addPoint(e) {
-        if (!isDrawing && !isErasing || currentSection !== 'drawing') return;
+        if (!isDrawing && !isErasing || currentSection !== 'drawing' || isLocked) return;
         const point = getCoordinates(e);
         strokePoints.push(point);
 
@@ -1459,11 +1526,11 @@
 
     // Drawing and Swipe Event Listeners
     overlayCanvas.addEventListener('mousedown', (e) => {
-        if (currentSection === 'drawing' && isDrawing) {
+        if (currentSection === 'drawing' && isDrawing && !isLocked) {
             lastPoint = getCoordinates(e);
             lastTime = lastPoint.time;
             strokePoints = [lastPoint];
-        } else if (currentSection === 'drawing' && isErasing) {
+        } else if (currentSection === 'drawing' && isErasing && !isLocked) {
             const point = getCoordinates(e);
             strokePoints = [point];
             eraseStroke(point.x, point.y);
@@ -1471,9 +1538,9 @@
     });
 
     overlayCanvas.addEventListener('mousemove', (e) => {
-        if (currentSection === 'drawing' && isDrawing) {
+        if (currentSection === 'drawing' && isDrawing && !isLocked) {
             addPoint(e);
-        } else if (currentSection === 'drawing' && isErasing) {
+        } else if (currentSection === 'drawing' && isErasing && !isLocked) {
             const point = getCoordinates(e);
             strokePoints.push(point);
             eraseStroke(point.x, point.y);
@@ -1481,7 +1548,7 @@
     });
 
     overlayCanvas.addEventListener('mouseup', () => {
-        if (currentSection === 'drawing' && (isDrawing || isErasing) && strokePoints.length > 0) {
+        if (currentSection === 'drawing' && (isDrawing || isErasing) && !isLocked && strokePoints.length > 0) {
             saveCanvasState(strokePoints);
             redoStack = [];
             strokePoints = [];
@@ -1491,7 +1558,10 @@
 
     overlayCanvas.addEventListener('touchstart', (e) => {
         if (currentSection === 'drawing') {
-            if (e.touches.length === 1) {
+            if (isLocked && e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            } else if (!isLocked && e.touches.length === 1) {
                 isDrawing = true;
                 isErasing = false;
                 document.getElementById('drawButton').classList.add('active');
@@ -1499,7 +1569,7 @@
                 lastPoint = getCoordinates(e);
                 lastTime = lastPoint.time;
                 strokePoints = [lastPoint];
-            } else if (e.touches.length === 2) {
+            } else if (!isLocked && e.touches.length === 2) {
                 isErasing = true;
                 isDrawing = false;
                 document.getElementById('eraseButton').classList.add('active');
@@ -1507,7 +1577,7 @@
                 const point = getCoordinates(e);
                 strokePoints = [point];
                 eraseStroke(point.x, point.y);
-            } else if (e.touches.length === 3) {
+            } else if (!isLocked && e.touches.length === 3) {
                 undo();
                 e.preventDefault();
                 return;
@@ -1517,27 +1587,40 @@
     });
 
     overlayCanvas.addEventListener('touchmove', (e) => {
-        if (currentSection === 'drawing' && (e.touches.length === 1 || e.touches.length === 2)) {
+        if (currentSection === 'drawing' && !isLocked && (e.touches.length === 1 || e.touches.length === 2)) {
             addPoint(e);
             e.preventDefault();
         }
     });
 
     overlayCanvas.addEventListener('touchend', (e) => {
-        if (currentSection === 'drawing' && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
+        if (currentSection === 'drawing' && isLocked && e.changedTouches.length === 1) {
+            const touchEndX = e.changedTouches[0].clientX;
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchStartY - e.changedTouches[0].clientY;
+            const swipeThreshold = 100;
+            if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaY) < swipeThreshold) {
+                if (deltaX > 0) {
+                    previousPage();
+                } else {
+                    nextPage();
+                }
+            }
+        } else if (currentSection === 'drawing' && !isLocked && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
             saveCanvasState(strokePoints);
             redoStack = [];
             strokePoints = [];
             lastPoint = null;
-            e.preventDefault();
         }
+        e.preventDefault();
     });
 
     overlayCanvas.addEventListener('wheel', (e) => {
-        e.preventDefault();
+        if (!isLocked) e.preventDefault();
     });
 
     // Window resize handling
     window.addEventListener('resize', resizeCanvas);
 </script>
+</body>
 </html>
